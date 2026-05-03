@@ -1,0 +1,103 @@
+ <div id="delta-race-container" style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 4px solid #fff; background: #228B22; overflow: hidden; font-family: Arial, sans-serif;">
+    
+    <div id="placar" style="position: absolute; top: 15px; left: 15px; color: white; font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000; z-index: 100;">PASSES: 000</div>
+    
+    <div style="position: absolute; bottom: 100px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 101;">
+        <button onclick="mudarVolume(0.02)" style="background: #ff0000; color: white; border: 2px solid #fff; font-weight: bold; cursor: pointer; padding: 12px; border-radius: 8px; font-size: 20px; width: 50px; box-shadow: 2px 2px 5px #000;">+</button>
+        <button onclick="mudarVolume(-0.02)" style="background: #ff0000; color: white; border: 2px solid #fff; font-weight: bold; cursor: pointer; padding: 12px; border-radius: 8px; font-size: 20px; width: 50px; box-shadow: 2px 2px 5px #000;">-</button>
+    </div>
+    
+    <canvas id="gameCanvas" width="400" height="500" style="display: block;"></canvas>
+</div>
+
+<script>
+(function() {
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    let playerX = 180, inimigos = [], score = 0, frames = 0, keys = {}, audioCtx = null, motorGain = null, volMotor = 0.04;
+    let nuvensX = [50, 220, 380];
+    const horY = 150, horW = 60, baseW = 380;
+
+    window.onkeydown = (e) => { keys[e.code] = true; if(!audioCtx) iniciarAudio(); };
+    window.onkeyup = (e) => keys[e.code] = false;
+
+    function iniciarAudio() {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        motorGain = audioCtx.createGain();
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(50, audioCtx.currentTime);
+        motorGain.gain.setValueAtTime(volMotor, audioCtx.currentTime);
+        osc.connect(motorGain); motorGain.connect(audioCtx.destination);
+        osc.start();
+        setInterval(() => { if(motorGain) motorGain.gain.setTargetAtTime(volMotor, audioCtx.currentTime, 0.1); }, 100);
+    }
+
+    // --- NOVA FUNÇÃO PARA O SOM DA BATIDA ---
+    function tocarSomBatida() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'square'; // Som mais agressivo de impacto
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
+        g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        g.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    }
+
+    window.mudarVolume = function(valor) { volMotor = Math.max(0, Math.min(0.3, volMotor + valor)); };
+
+    function desenharCenario() {
+        ctx.fillStyle = "#87CEEB"; ctx.fillRect(0, 0, 400, horY);
+        ctx.fillStyle = "white";
+        nuvensX.forEach((nx, i) => {
+            ctx.beginPath(); 
+            ctx.arc(nx, 40, 15, 0, Math.PI*2); ctx.arc(nx + 15, 35, 20, 0, Math.PI*2); ctx.arc(nx + 30, 40, 15, 0, Math.PI*2);
+            ctx.fill();
+            nuvensX[i] += 0.5; if(nuvensX[i] > 420) nuvensX[i] = -50;
+        });
+        ctx.fillStyle = "#5d4037"; ctx.beginPath(); ctx.moveTo(0, horY); ctx.lineTo(60, 80); ctx.lineTo(130, horY); ctx.fill();
+        ctx.fillStyle = "#8d6e63"; ctx.beginPath(); ctx.moveTo(200, horY); ctx.lineTo(300, 60); ctx.lineTo(400, horY); ctx.fill();
+        ctx.fillStyle = "#000088"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center"; ctx.fillText("DELTA RACE", 200, 45);
+        ctx.textAlign = "start";
+    }
+
+    function desenharBaratinha(x, y, w, h, cor) {
+        let sw = w / 40; let sh = h / 20;
+        ctx.fillStyle = "#111"; // Rodas
+        ctx.fillRect(x - (sw*8), y + (sh*15), sw*12, sh*15); ctx.fillRect(x + (sw*36), y + (sh*15), sw*12, sh*15);
+        ctx.fillRect(x + (sw*2), y - (sh*8), sw*8, sh*10); ctx.fillRect(x + (sw*30), y - (sh*8), sw*8, sh*10);
+        ctx.fillStyle = cor;
+        ctx.beginPath(); ctx.moveTo(x, y + (sh*30)); ctx.lineTo(x + (sw*40), y + (sh*30)); ctx.lineTo(x + (sw*28), y - (sh*5)); ctx.lineTo(x + (sw*12), y - (sh*5)); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + (sw*20), y - (sh*5), sw*8, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(x + (sw*20), y + (sh*10), sw*6, 0, Math.PI*2); ctx.fill();
+    }
+
+    function loop() {
+        ctx.fillStyle = "#228B22"; ctx.fillRect(0, 0, 400, 500); 
+        desenharCenario();
+        ctx.fillStyle = "#444"; ctx.beginPath(); ctx.moveTo(170, 150); ctx.lineTo(230, 150); ctx.lineTo(395, 500); ctx.lineTo(5, 500); ctx.fill();
+        if (keys["ArrowLeft"] && playerX > 45) playerX -= 7;
+        if (keys["ArrowRight"] && playerX < 315) playerX += 7;
+        frames++;
+        if (frames % 35 === 0) inimigos.push({ y: horY, rel: (Math.random() * 2) - 1 });
+        inimigos.forEach((ini, index) => {
+            ini.y += 6; let prog = (ini.y - horY) / 350;
+            let pxInimigo = 200 + (ini.rel * (60 + 320 * prog) / 2.5);
+            let wInimigo = 8 + prog * 40; let hInimigo = 4 + prog * 20;
+            desenharBaratinha(pxInimigo - wInimigo/2, ini.y, wInimigo, hInimigo, "#222");
+
+            // --- LÓGICA DE COLISÃO COM SOM ---
+            if (ini.y > 400 && ini.y < 460 && pxInimigo > playerX - 15 && pxInimigo < playerX + 55) { 
+                tocarSomBatida(); // <--- O som toca aqui agora!
+                score = 0; inimigos = []; document.getElementById("placar").innerText = "PASSES: 000"; 
+            }
+            if (ini.y > 500) { inimigos.splice(index, 1); score++; document.getElementById("placar").innerText = "PASSES: " + score.toString().padStart(3, '0'); }
+        });
+        desenharBaratinha(playerX, 420, 40, 20, "#ff0000"); 
+        requestAnimationFrame(loop);
+    }
+    loop();
+})();
+</script>
