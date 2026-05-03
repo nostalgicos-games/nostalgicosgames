@@ -1,6 +1,58 @@
- <div id="delta-race-container" style="position: relative; width: 400px; height: 500px; margin: 0 auto; border: 4px solid #fff; background: #228B22; overflow: hidden; font-family: Arial, sans-serif;">
+<!doctype html>
+
+
     
-    <div id="placar" style="position: absolute; top: 15px; left: 15px; color: white; font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000; z-index: 100;">PASSES: 000</div>
+    
+    Delta Race - Nostalgic Games
+    <style>
+        /* ESTILO DO FUNDO E DA PÁGINA */
+        body {
+            /* Imagem de fundo: tijolos escuros retrô */
+            background-image: url('https://img.freepik.com/fotos-gratis/fundo-de-parede-de-tijolo-preto_53876-88600.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* MOLDURA DO JOGO (TELA DE TUBO) */
+        #delta-race-container {
+            position: relative;
+            width: 400px;
+            height: 500px;
+            border: 15px solid #1a1a1a; /* Moldura grossa de plástico */
+            border-radius: 30px;        /* Cantos arredondados de TV antiga */
+            box-shadow: 0px 0px 50px rgba(0, 0, 0, 0.9), 0px 0px 20px rgba(135, 206, 235, 0.4);
+            background: #228B22;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        /* TÍTULO EM CIMA DO JOGO */
+        .header-title {
+            position: absolute;
+            top: 5px;
+            width: 100%;
+            text-align: center;
+            color: #ff0;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            z-index: 102;
+            text-shadow: 2px 2px #000;
+        }
+    </style>
+
+
+
+<div id="delta-race-container">
+    <div class="header-title">ARCADE CLASSIC</div>
+    
+    <div id="placar" style="position: absolute; top: 35px; left: 15px; color: white; font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000; z-index: 100;">PASSES: 000</div>
     
     <div style="position: absolute; bottom: 100px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 101;">
         <button onclick="mudarVolume(0.02)" style="background: #ff0000; color: white; border: 2px solid #fff; font-weight: bold; cursor: pointer; padding: 12px; border-radius: 8px; font-size: 20px; width: 50px; box-shadow: 2px 2px 5px #000;">+</button>
@@ -32,12 +84,11 @@
         setInterval(() => { if(motorGain) motorGain.gain.setTargetAtTime(volMotor, audioCtx.currentTime, 0.1); }, 100);
     }
 
-    // --- NOVA FUNÇÃO PARA O SOM DA BATIDA ---
     function tocarSomBatida() {
         if (!audioCtx) return;
         const osc = audioCtx.createOscillator();
         const g = audioCtx.createGain();
-        osc.type = 'square'; // Som mais agressivo de impacto
+        osc.type = 'square';
         osc.frequency.setValueAtTime(150, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
         g.gain.setValueAtTime(0.3, audioCtx.currentTime);
@@ -65,7 +116,7 @@
 
     function desenharBaratinha(x, y, w, h, cor) {
         let sw = w / 40; let sh = h / 20;
-        ctx.fillStyle = "#111"; // Rodas
+        ctx.fillStyle = "#111"; 
         ctx.fillRect(x - (sw*8), y + (sh*15), sw*12, sh*15); ctx.fillRect(x + (sw*36), y + (sh*15), sw*12, sh*15);
         ctx.fillRect(x + (sw*2), y - (sh*8), sw*8, sh*10); ctx.fillRect(x + (sw*30), y - (sh*8), sw*8, sh*10);
         ctx.fillStyle = cor;
@@ -88,9 +139,8 @@
             let wInimigo = 8 + prog * 40; let hInimigo = 4 + prog * 20;
             desenharBaratinha(pxInimigo - wInimigo/2, ini.y, wInimigo, hInimigo, "#222");
 
-            // --- LÓGICA DE COLISÃO COM SOM ---
             if (ini.y > 400 && ini.y < 460 && pxInimigo > playerX - 15 && pxInimigo < playerX + 55) { 
-                tocarSomBatida(); // <--- O som toca aqui agora!
+                tocarSomBatida();
                 score = 0; inimigos = []; document.getElementById("placar").innerText = "PASSES: 000"; 
             }
             if (ini.y > 500) { inimigos.splice(index, 1); score++; document.getElementById("placar").innerText = "PASSES: " + score.toString().padStart(3, '0'); }
@@ -101,3 +151,5 @@
     loop();
 })();
 </script>
+
+</!doctype>
