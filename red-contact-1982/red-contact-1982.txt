@@ -1,0 +1,210 @@
+index.html
+<!doctype html>
+
+
+    
+    
+    RED CONTACT 1982 - Mobile Fix
+    <style>
+        body { margin: 0; background: #000; color: #ff0000; font-family: 'Courier New', monospace; overflow: hidden; touch-action: none; }
+        #gameContainer { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        
+        canvas { 
+            background: linear-gradient(to bottom, #10002b, #3c096c 60%, #ff5d8f 80%, #ffb3c1 100%); 
+            border: 2px solid #ff0000; 
+            width: 95vw; height: auto; 
+            max-width: 600px;
+            display: block;
+        }
+
+        /* PAINEL DE CONTROLES SOBREPOSTO AO JOGO */
+        #controlsLayer {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 95vw; max-width: 600px; height: 300px; /* Mesma altura do canvas */
+            pointer-events: none; /* Deixa o clique passar para os botões filhos */
+        }
+
+        .joy-btn {
+            position: absolute;
+            width: 60px; height: 60px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid #ff0000;
+            border-radius: 50%;
+            color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 20px;
+            pointer-events: auto; /* Reativa o toque nos botões */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Posições dos botões (Esquerda: Movimento | Direita: Tiro) */
+        #btnUp { left: 50px; bottom: 140px; }
+        #btnDown { left: 50px; bottom: 20px; }
+        #btnLeft { left: 10px; bottom: 80px; }
+        #btnRight { left: 90px; bottom: 80px; }
+        #btnFire { right: 20px; bottom: 70px; width: 80px; height: 80px; background: rgba(255, 255, 255, 0.3); border-color: #fff; font-size: 30px; }
+
+        #gameDesc { width: 95vw; max-width: 600px; margin-top: 10px; color: #aaa; font-size: 11px; text-align: center; }
+    </style>
+
+
+
+<div id="gameContainer">
+    <div style="color:#fff; margin-bottom:5px;">SCORE: <span id="score">0</span></div>
+    
+    <div style="position:relative;">
+        <canvas id="gameCanvas" width="600" height="300"></canvas>
+        
+        <div id="controlsLayer">
+            <div id="btnUp" class="joy-btn">▲</div>
+            <div id="btnDown" class="joy-btn">▼</div>
+            <div id="btnLeft" class="joy-btn">◀</div>
+            <div id="btnRight" class="joy-btn">▶</div>
+            <div id="btnFire" class="joy-btn">X</div>
+        </div>
+    </div>
+
+    <div id="gameDesc">
+        <b>RED CONTACT 1982</b> - Use os botões na tela ou setas do teclado.<br />
+        Abata as naves (+100 pts). Se bater, o Score zera!
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
+
+// ÁUDIO (ATIVAR NO PRIMEIRO TOQUE)
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSfx(freq, type, duration, vol=0.1) {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    } catch(e) {}
+}
+
+let score = 0;
+let lasers = [];
+let enemies = [];
+let ufo = { x: 100, y: 150, w: 40, h: 20, dx: 0, dy: 0, dir: 1, speed: 5 };
+
+class Enemy {
+    constructor() {
+        this.dir = Math.random() > 0.5 ? 1 : -1;
+        this.x = this.dir === 1 ? -30 : canvas.width + 30;
+        this.y = Math.random() * (canvas.height - 120) + 40;
+        this.speed = Math.random() * 2 + 2;
+        this.isFalling = false;
+        this.vSpeed = 0;
+    }
+    update() {
+        if (!this.isFalling) {
+            this.x += this.speed * this.dir;
+            if(this.x > canvas.width + 100) this.x = -50;
+            if(this.x < -100) this.x = canvas.width + 100;
+            if (Math.hypot(this.x - ufo.x, this.y - ufo.y) < 20) resetGame();
+        } else {
+            this.vSpeed += 0.4;
+            this.y += this.vSpeed;
+            if(this.y >= canvas.height - 30) return true;
+        }
+        return false;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        if (!this.isFalling) ctx.scale(this.dir, 1);
+        ctx.fillStyle = this.isFalling ? "#555" : "#f0f";
+        ctx.beginPath(); ctx.moveTo(-10, -10); ctx.lineTo(15, 0); ctx.lineTo(-10, 10); ctx.fill();
+        ctx.restore();
+    }
+}
+
+function resetGame() {
+    playSfx(50, 'sawtooth', 0.3, 0.2);
+    score = 0; scoreEl.innerText = score;
+    enemies = []; ufo.x = 100; ufo.y = 150;
+}
+
+function fire() {
+    lasers.push({ x: ufo.x, y: ufo.y, s: 10 * ufo.dir });
+    playSfx(880, 'sawtooth', 0.1);
+}
+
+function drawScenery() {
+    ctx.fillStyle = "#1a0026"; ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
+    ctx.fillStyle = "#000"; ctx.fillRect(canvas.width - 70, canvas.height - 70, 25, 40);
+    ctx.beginPath(); ctx.arc(canvas.width - 57.5, canvas.height - 70, 15, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.moveTo(canvas.width - 57, canvas.height - 75); ctx.lineTo(canvas.width - 80, canvas.height - 95); ctx.stroke();
+}
+
+function update() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawScenery();
+    ufo.x += ufo.dx; ufo.y += ufo.dy;
+    if(ufo.y < 20) ufo.y = 20; if(ufo.y > 250) ufo.y = 250;
+    ctx.save();
+    ctx.translate(ufo.x, ufo.y); ctx.scale(ufo.dir, 1);
+    ctx.fillStyle = "#f00"; ctx.beginPath(); ctx.ellipse(0, 0, ufo.w/2, ufo.h/2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.7)"; ctx.arc(0, -5, 8, 0, Math.PI, true); ctx.fill();
+    ctx.restore();
+    lasers.forEach((l, li) => {
+        l.x += l.s; ctx.fillStyle = "#fff"; ctx.fillRect(l.x, l.y, 10, 2);
+        if(l.x > canvas.width || l.x < 0) lasers.splice(li, 1);
+        enemies.forEach(e => {
+            if(!e.isFalling && l.x > e.x-15 && l.x < e.x+15 && l.y > e.y-15 && l.y < e.y+15) {
+                e.isFalling = true; e.vSpeed = -4; lasers.splice(li, 1);
+                score += 100; scoreEl.innerText = score;
+                playSfx(400, 'sine', 0.1);
+            }
+        });
+    });
+    if(Math.random() < 0.02 && enemies.length < 5) enemies.push(new Enemy());
+    enemies = enemies.filter(e => !e.update());
+    enemies.forEach(e => e.draw());
+    requestAnimationFrame(update);
+}
+
+// --- FUNÇÃO DE CONTROLE UNIFICADA (TOUCH + MOUSE) ---
+function setupControl(id, start, end) {
+    const el = document.getElementById(id);
+    const events = ['touchstart', 'mousedown'];
+    const endEvents = ['touchend', 'mouseup', 'mouseleave'];
+    
+    events.forEach(evt => el.addEventListener(evt, (e) => { e.preventDefault(); start(); }));
+    endEvents.forEach(evt => el.addEventListener(evt, (e) => { e.preventDefault(); end(); }));
+}
+
+setupControl('btnUp', () => ufo.dy = -ufo.speed, () => ufo.dy = 0);
+setupControl('btnDown', () => ufo.dy = ufo.speed, () => ufo.dy = 0);
+setupControl('btnLeft', () => { ufo.dx = -ufo.speed; ufo.dir = -1; }, () => ufo.dx = 0);
+setupControl('btnRight', () => { ufo.dx = ufo.speed; ufo.dir = 1; }, () => ufo.dx = 0);
+document.getElementById('btnFire').addEventListener('touchstart', (e) => { e.preventDefault(); fire(); });
+document.getElementById('btnFire').addEventListener('mousedown', (e) => { e.preventDefault(); fire(); });
+
+// Teclado continua funcionando
+window.addEventListener('keydown', e => {
+    if(e.key === 'ArrowUp') ufo.dy = -ufo.speed;
+    if(e.key === 'ArrowDown') ufo.dy = ufo.speed;
+    if(e.key === 'ArrowLeft') { ufo.dx = -ufo.speed; ufo.dir = -1; }
+    if(e.key === 'ArrowRight') { ufo.dx = ufo.speed; ufo.dir = 1; }
+    if(e.key.toLowerCase() === 'x' || e.key === ' ') { e.preventDefault(); fire(); }
+});
+window.addEventListener('keyup', () => { ufo.dx = 0; ufo.dy = 0; });
+
+update();
+</script>
+
+</!doctype>
